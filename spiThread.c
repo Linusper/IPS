@@ -36,6 +36,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <float.h>
 
 #include <xdc/std.h>
 #include <xdc/runtime/Error.h>
@@ -53,7 +54,7 @@
 #include "Board.h"
 
 Task_Struct spiTask;
-#define THREADSTACKSIZE    (1024)
+#define THREADSTACKSIZE    1024
 uint8_t spiTaskStack[THREADSTACKSIZE];
 
 #define SPI_MSG_LENGTH  (20)
@@ -115,12 +116,12 @@ typedef struct {
 } RawData_t;
 
 typedef struct {
-    float x;
-    float y;
-    float z;
+    int16_t x;
+    int16_t y;
+    int16_t z;
 } AccData_t;
 
-void gpioButtonFxn0(uint_least8_t index)
+void ButtonFxn0(uint_least8_t index)
 {
     if (breakMeasureLoop){
         breakMeasureLoop = false;
@@ -131,7 +132,7 @@ void gpioButtonFxn0(uint_least8_t index)
     Semaphore_post(spiSem);
 }
 
-void gpioButtonFxn1(uint_least8_t index)
+void ButtonFxn1(uint_least8_t index)
 {
     breakProgramLoop = true;
 }
@@ -140,6 +141,7 @@ void readAddress(SPI_Handle handle, uint8_t address, uint8_t *p_data, uint8_t by
 
     bool transferOK;
     SPI_Transaction transaction;
+
     memset((void *) masterTxBuffer, 0, SPI_MSG_LENGTH);
     memset((void *) masterRxBuffer, 0, SPI_MSG_LENGTH);
 
@@ -159,8 +161,8 @@ void readAddress(SPI_Handle handle, uint8_t address, uint8_t *p_data, uint8_t by
         uint8_t i;
         for (i = 0; i < bytes; i++){
             p_data[i] = masterRxBuffer[i+1];
-            Display_print2(dispHandle, 8, 0, "Master received: %x, %x", p_data[0], p_data[1]);
         }
+        Display_print4(dispHandle, 8, 0, "Master received: %x, %x, %x, %x", masterRxBuffer[0], masterRxBuffer[1], masterRxBuffer[2], masterRxBuffer[3]);
     }
     else {
         Display_print0(dispHandle, 8, 0, "Unsuccessful master SPI transfer");
@@ -215,9 +217,9 @@ void readAccData(SPI_Handle handle, AccData_t *data){
     RawData_t rawData;
     readRawData(handle, &rawData);
 
-    data->x = ((float) rawData.x * 3.9 * 9.81) / 1000;
-    data->y = ((float) rawData.y * 3.9 * 9.81) / 1000;
-    data->z = ((float) rawData.z * 3.9 * 9.81) / 1000;
+    data->x = (rawData.x * 4 * 10); //* 3.9 * 9.82
+    data->y = (rawData.y * 4 * 10);
+    data->z = (rawData.z * 4 * 10);
 
 }
 
@@ -250,14 +252,13 @@ void initAccelerometer(SPI_Handle handle){
  *  Master SPI sends a message to slave while simultaneously receiving a
  *  message from the slave.
  */
-static void spiThread(UArg a0, UArg a1)
-{
+static void spiThread(UArg a0, UArg a1) {
+
     SPI_Handle          masterSpi;
     SPI_Params          spiParams;
     AccData_t           accData;
     RawData_t           rawData;
     Semaphore_Params    semParams;
-    uint8_t count = 0;
 
     /* Call driver init functions. */
     GPIO_init();
@@ -272,18 +273,16 @@ static void spiThread(UArg a0, UArg a1)
         while (1);
     }
 
-
-
     /* Configure the LED pins */
     GPIO_setConfig(Board_GPIO_LED0, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
     GPIO_setConfig(Board_GPIO_LED1, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
 
     GPIO_setConfig(Board_GPIO_BUTTON0, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
-    GPIO_setCallback(Board_GPIO_BUTTON0, gpioButtonFxn0);
+    GPIO_setCallback(Board_GPIO_BUTTON0, ButtonFxn0);
     GPIO_enableInt(Board_GPIO_BUTTON0);
 
     GPIO_setConfig(Board_GPIO_BUTTON1, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
-    GPIO_setCallback(Board_GPIO_BUTTON1, gpioButtonFxn1);
+    GPIO_setCallback(Board_GPIO_BUTTON1, ButtonFxn1);
     GPIO_enableInt(Board_GPIO_BUTTON1);
 
     /* Turn on user LED */
@@ -296,21 +295,19 @@ static void spiThread(UArg a0, UArg a1)
     spiParams.frameFormat = SPI_POL1_PHA1;
     spiParams.dataSize = 8;
     spiParams.bitRate = 10000;
-    masterSpi = SPI_open(Board_SPI_MASTER, &spiParams);
+    masterSpi = SPI_open(Board_SPI0, &spiParams);
     if (masterSpi == NULL) {
-        Display_print0(dispHandle, 6, 0, "Error initializing master SPI\n");
+        Display_print0(dispHandle, 11, 0, "Error initializing master SPI\n");
         while (1);
     }
     else {
-        Display_print0(dispHandle, 6, 0, "Master SPI initialized\n");
+        Display_print0(dispHandle, 11, 0, "Master SPI initialized\n");
     }
-
-    Semaphore_pend(spiSem, BIOS_WAIT_FOREVER);
 
     uint8_t deviceID;
     readAddress(masterSpi, 0x00, &deviceID, (uint8_t) 1);
     Display_print1(dispHandle, 6, 0, "Device ID: %x", deviceID);
-
+    Semaphore_pend(spiSem, BIOS_WAIT_FOREVER);
 
     //------ Initialize the accelerometer ---------
     initAccelerometer(masterSpi);
@@ -324,10 +321,9 @@ static void spiThread(UArg a0, UArg a1)
             GPIO_toggle(Board_GPIO_LED1);
 
             readRawData(masterSpi, &rawData);
-            Display_print4(dispHandle, 9, 0, "%d RAW  X: %d, Y: %d, Z: %d\n", count, rawData.x, rawData.y, rawData.z);
+            Display_print3(dispHandle, 9, 0, "RAW  X: %d, Y: %d, Z: %d", rawData.x, rawData.y, rawData.z);
             readAccData(masterSpi, &accData);
-            Display_print4(dispHandle, 10, 0, "%d ACC  X: %f, Y: %f, Z: %f\n", count, accData.x, accData.y, accData.z);
-            count++;
+            Display_print3(dispHandle, 10, 0, "ACC  X: %d, Y: %d, Z: %d", accData.x, accData.y, accData.z);
             /* Sleep for a bit before starting the next SPI transfer  */
             //sleep(1);
             Semaphore_post(spiSem);
@@ -336,9 +332,9 @@ static void spiThread(UArg a0, UArg a1)
 
     }
 
-    SPI_close(masterSpi);
+    //SPI_close(masterSpi);
 
-    Display_print0(dispHandle, 11, 0, "\nDone");
+    //Display_print0(dispHandle, 11, 0, "\nDone");
 
     //return (NULL);
 }
