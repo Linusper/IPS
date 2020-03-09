@@ -58,6 +58,7 @@ Task_Struct spiTask;
 uint8_t spiTaskStack[THREADSTACKSIZE];
 
 #define SPI_MSG_LENGTH  (20)
+#define ACC_DATA_LENGTH (6)
 
 // ---------- REGISTERS ---------------
 
@@ -108,6 +109,8 @@ unsigned char masterTxBuffer[SPI_MSG_LENGTH];
 
 bool breakProgramLoop = false;
 bool breakMeasureLoop = false;
+
+uint8_t dataToSend[ACC_DATA_LENGTH];
 
 typedef struct {
     int16_t x;
@@ -162,10 +165,10 @@ void readAddress(SPI_Handle handle, uint8_t address, uint8_t *p_data, uint8_t by
         for (i = 0; i < bytes; i++){
             p_data[i] = masterRxBuffer[i+1];
         }
-        Display_print4(dispHandle, 8, 0, "Master received: %x, %x, %x, %x", masterRxBuffer[0], masterRxBuffer[1], masterRxBuffer[2], masterRxBuffer[3]);
+        Display_print4(dispHandle, 7, 0, "Master received: %x, %x, %x, %x", masterRxBuffer[1], masterRxBuffer[2], masterRxBuffer[3], masterRxBuffer[4]);
     }
     else {
-        Display_print0(dispHandle, 8, 0, "Unsuccessful master SPI transfer");
+        Display_print0(dispHandle, 7, 0, "Unsuccessful master SPI transfer");
     }
 
 }
@@ -191,7 +194,22 @@ void writeAddress(SPI_Handle handle, uint8_t address, uint8_t data){
     }
 }
 
-void readRawData(SPI_Handle handle, RawData_t *data){
+void readRawData(SPI_Handle handle, uint8_t *data){
+
+    uint8_t size = 6;
+    //uint8_t rxBuffer[size];
+
+    memset((void *) data, 0, size);
+
+    readAddress(handle, DATAX0, data, size);
+ /*
+    rawX = (rxBuffer[1]<<8) | rxBuffer[0];
+    rawY = (rxBuffer[3]<<8) | rxBuffer[2];
+    rawZ = (rxBuffer[5]<<8) | rxBuffer[4];
+*/
+}
+
+void readAccData(SPI_Handle handle, AccData_t *data){
 
     uint8_t rxBuffer[6];
     int16_t rawX = 0x0000;
@@ -206,20 +224,9 @@ void readRawData(SPI_Handle handle, RawData_t *data){
     rawY = (rxBuffer[3]<<8) | rxBuffer[2];
     rawZ = (rxBuffer[5]<<8) | rxBuffer[4];
 
-    data->x = rawX;
-    data->y = rawY;
-    data->z = rawZ;
-
-}
-
-void readAccData(SPI_Handle handle, AccData_t *data){
-
-    RawData_t rawData;
-    readRawData(handle, &rawData);
-
-    data->x = (rawData.x * 4 * 10); //* 3.9 * 9.82
-    data->y = (rawData.y * 4 * 10);
-    data->z = (rawData.z * 4 * 10);
+    data->x = rawX * 4 * 10;
+    data->y = rawY * 4 * 10;
+    data->z = rawZ * 4 * 10;
 
 }
 
@@ -247,6 +254,17 @@ void initAccelerometer(SPI_Handle handle){
     writeAddress(handle, POWER_CTL, 0x08);
 }
 
+void setValueToSend(uint8_t *txData, uint8_t *rawData){
+    uint8_t i;
+    if (sizeof(rawData) != sizeof(txData)){
+        Display_print0(dispHandle, 6, 0, "Sizes do not match\n");
+        return;
+    }
+    for (i = 0; i < ACC_DATA_LENGTH; i++){
+        txData[i] = rawData[i];
+    }
+}
+
 /*
  *  ======== masterThread ========
  *  Master SPI sends a message to slave while simultaneously receiving a
@@ -257,7 +275,8 @@ static void spiThread(UArg a0, UArg a1) {
     SPI_Handle          masterSpi;
     SPI_Params          spiParams;
     AccData_t           accData;
-    RawData_t           rawData;
+  //RawData_t           rawData;
+    uint8_t             rawData[ACC_DATA_LENGTH];
     Semaphore_Params    semParams;
 
     /* Call driver init functions. */
@@ -320,10 +339,14 @@ static void spiThread(UArg a0, UArg a1) {
             /* Toggle user LED, indicating a SPI transfer is in progress */
             GPIO_toggle(Board_GPIO_LED1);
 
-            readRawData(masterSpi, &rawData);
-            Display_print3(dispHandle, 9, 0, "RAW  X: %d, Y: %d, Z: %d", rawData.x, rawData.y, rawData.z);
+            readRawData(masterSpi, rawData);
+            setValueToSend(dataToSend, rawData);
+            Display_print2(dispHandle, 8 , 0, "RAW  X: %x %x", dataToSend[1], dataToSend[0]);
+            Display_print2(dispHandle, 9 , 0, "RAW  Y: %x %x", dataToSend[3], dataToSend[2]);
+            Display_print2(dispHandle, 10, 0, "RAW  Z: %x %x", dataToSend[5], dataToSend[4]);
+            //Display_print3(dispHandle, 9, 0, "RAW  X: %d, Y: %d, Z: %d", rawData.x, rawData.y, rawData.z);
             readAccData(masterSpi, &accData);
-            Display_print3(dispHandle, 10, 0, "ACC  X: %d, Y: %d, Z: %d", accData.x, accData.y, accData.z);
+            Display_print3(dispHandle, 11, 0, "ACC  X: %d, Y: %d, Z: %d", accData.x, accData.y, accData.z);
             /* Sleep for a bit before starting the next SPI transfer  */
             //sleep(1);
             Semaphore_post(spiSem);
