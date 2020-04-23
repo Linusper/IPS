@@ -1,0 +1,198 @@
+/******************************************************************************
+
+ @file  rtls_ctrl.h
+
+ @brief This file contains internal defines and macros used by rtls_ctrl.c
+
+ Group: WCS, BTS
+ Target Device: cc2640r2
+
+ ******************************************************************************
+ 
+ Copyright (c) 2018-2020, Texas Instruments Incorporated
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+
+ *  Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+ *  Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+
+ *  Neither the name of Texas Instruments Incorporated nor the names of
+    its contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ ******************************************************************************
+ 
+ 
+ *****************************************************************************/
+
+/**
+ *  @defgroup RTLS_CTRL RTLS_CTRL
+ *  @brief This module implements Real Time Localization System (RTLS) Control module
+ *
+ *  @{
+ *  @file  rtls_ctrl.h
+ *  @brief      RTLS Control module interface
+ */
+
+#ifndef RTLS_CTRL_H_
+#define RTLS_CTRL_H_
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+/*********************************************************************
+ * INCLUDES
+ */
+#ifdef USE_ICALL
+#include "icall.h"
+#else
+#define HAL_ASSERT_CAUSE_OUT_OF_MEMORY          0x04    //!< RTLS Assert Error code
+#endif
+
+/*********************************************************************
+*  EXTERNAL VARIABLES
+*/
+
+/*********************************************************************
+ * CONSTANTS
+ */
+
+// RTLS Task configuration
+#define RTLS_CTRL_TASK_PRIORITY   2       //!< RTLS Task configuration variable
+#define RTLS_CTRL_TASK_STACK_SIZE 640     //!< RTLS Task configuration variable
+
+#define RTLS_QUEUE_EVT            UTIL_QUEUE_EVENT_ID   //!< Event_Id_30
+
+#define RTLS_CTRL_ALL_EVENTS      (RTLS_QUEUE_EVT)      //!< RTLS Task configuration
+
+
+#define RTLS_CMD_IDENTIFY                 0x00          //!< RTLS Node Manager command
+#define RTLS_CMD_RESERVED                 0x01          //!< RTLS Node Manager command
+#define RTLS_CMD_CONN_PARAMS              0x02          //!< RTLS Node Manager command
+#define RTLS_CMD_CONNECT                  0x03          //!< RTLS Node Manager command
+#define RTLS_CMD_SCAN                     0x04          //!< RTLS Node Manager command
+#define RTLS_CMD_SCAN_STOP                0x05          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_RESULT_DIST          0x06          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_RESULT_STAT          0x07          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_RESULT_RAW           0x08          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_SET_SEC_SEED         0x09          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_GET_SEC_SEED         0x10          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_SET_PARAMS           0x11          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_ENABLE               0x12          //!< RTLS Node Manager command
+#define RTLS_CMD_AOA_SET_PARAMS           0x13          //!< RTLS Node Manager command
+#define RTLS_CMD_AOA_ENABLE               0x14          //!< RTLS Node Manager command
+#define RTLS_CMD_RESET_DEVICE             0x20          //!< RTLS Node Manager command
+#define RTLS_CMD_TERMINATE_LINK           0x22          //!< RTLS Node Manager command
+#define RTLS_CMD_AOA_RESULT_ANGLE         0x23          //!< RTLS Node Manager command
+#define RTLS_CMD_AOA_RESULT_RAW           0x24          //!< RTLS Node Manager command
+#define RTLS_CMD_AOA_RESULT_PAIR_ANGLES   0x25          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_CALIBRATE            0x26          //!< RTLS Node Manager command
+#define RTLS_CMD_CONN_INFO                0x27          //!< RTLS Node Manager command
+#define RTLS_CMD_SET_RTLS_PARAM           0x28          //!< RTLS Node Manager command
+#define RTLS_CMD_GET_RTLS_PARAM           0x29          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_CALIB_NV_READ        0x30          //!< RTLS Node Manager command
+#define RTLS_CMD_TOF_SWITCH_ROLE          0x31          //!< RTLS Node Manager command
+#define RTLS_CMD_GET_ACTIVE_CONN_INFO     0x32
+#define RTLS_CMD_ACC_RESULT               0x33          //!< RTLS Node Manager command
+#define RTLS_CMD_ACC_RESULT_RAW           0x34          //!< RTLS Node Manager command
+#define RTLS_CMD_ACC_ENABLE               0x35          //!< RTLS Node Manager command
+#define RTLS_CMD_RSSI_RESULT              0x36          //!< RTLS Node Manager command
+//#define RTLS_CMD_ARRAY_RESULT             0x37          //!< RTLS Node Manager command
+//#define RTLS_CMD_Y_RESULT                 0x38          //!< RTLS Node Manager command
+//#define RTLS_CMD_Z_RESULT                 0x39          //!< RTLS Node Manager command
+
+#define RTLS_EVT_ASSERT                   0x80          //!< RTLS async event
+#define RTLS_EVT_ERROR                    0x81          //!< RTLS async event
+#define RTLS_EVT_DEBUG                    0x82          //!< RTLS async event
+#define RTLS_EVT_CONN_INFO                0x83          //!< RTLS async event
+
+// RTLS param types for RTLS_CMD_SET_RTLS_PARAM command
+#define RTLS_PARAM_CONNECTION_INTERVAL    0x01          //!< RTLS Param type RTLS_CMD_SET_RTLS_PARAM command
+#define RTLS_PARAM_2                      0x02          //!< RTLS Param type RTLS_CMD_SET_RTLS_PARAM command
+#define RTLS_PARAM_3                      0x03          //!< RTLS Param type RTLS_CMD_SET_RTLS_PARAM command
+
+/*********************************************************************
+ * MACROS
+ */
+#ifdef USE_ICALL
+/// @brief RTLSUTIL_MALLOC memory allocation with icall
+#define RTLSUTIL_MALLOC(pAlloc, size) {                               \
+                                        pAlloc = ICall_malloc(size);  \
+                                      }
+/// @brief RTLSUTIL_FREE memory free with icall
+#define RTLSUTIL_FREE(pMsg)           {                             \
+                                        ICall_free(pMsg);           \
+                                        pMsg = NULL;                \
+                                      }
+#else
+/// @brief RTLSUTIL_MALLOC memory allocation without icall
+#define RTLSUTIL_MALLOC(pAlloc, size) {                           \
+                                        volatile uint32_t keyHwi; \
+                                        volatile uint32_t keySwi; \
+                                        keyHwi = Hwi_disable();   \
+                                        keySwi = Swi_disable();   \
+                                        pAlloc = malloc(size);    \
+                                        Swi_restore(keySwi);      \
+                                        Hwi_restore(keyHwi);      \
+                                      }
+/// @brief RTLSUTIL_FREE memory free without icall
+#define RTLSUTIL_FREE(pFree)          {                           \
+                                        volatile uint32_t keyHwi; \
+                                        volatile uint32_t keySwi; \
+                                        keyHwi = Hwi_disable();   \
+                                        keySwi = Swi_disable();   \
+                                        free(pFree);              \
+                                        pFree = NULL;             \
+                                        Swi_restore(keySwi);      \
+                                        Hwi_restore(keyHwi);      \
+                                      }
+#endif
+/*********************************************************************
+ * TYPEDEFS
+ */
+
+/*********************************************************************
+ * API FUNCTIONS
+ */
+
+/**
+* @brief   This function will allocate memory, if we were unable to allocate
+*          we will report to RTLS Host
+*
+* @param   sz - size (Allocated pointer has to be cast)
+*
+* @return  none
+*/
+void* RTLSCtrl_malloc(uint32_t sz);
+
+/*********************************************************************
+*********************************************************************/
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* RTLS_CTRL_H_ */
+
+/** @} End RTLS_CTRL */
